@@ -5,74 +5,138 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Approval Helper</title>
 <style>
-body{
-  margin:0;
-  width:320px;
-  background:#16161e;
-  color:#c0caf5;
-  font-family:system-ui;
-}
-.container{
-  padding:14px;
-}
-.title{
-  font-weight:700;
-  margin-bottom:10px;
-}
-.card{
-  background:rgba(22,22,30,0.7);
-  border:1px solid rgba(122,162,247,0.2);
-  border-radius:12px;
-  padding:10px;
-  margin-bottom:10px;
-}
-.btn{
-  width:100%;
-  background:#7aa2f7;
-  border:none;
-  padding:10px;
-  border-radius:10px;
-  color:#0f0f14;
-  font-weight:700;
-  cursor:pointer;
-}
-.toggle{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-.small{
-  font-size:12px;
-  color:#a9b1d6;
-}
+  :root {
+    --bg: #1a1b26;
+    --card: rgba(31, 35, 53, 0.85);
+    --text: #c0caf5;
+    --muted: #a9b1d6;
+    --accent: #7aa2f7;
+    --green: #9ece6a;
+    --red: #f7768e;
+  }
+
+  body {
+    margin: 0;
+    width: 380px;
+    background: radial-gradient(circle at top, #16161e, #1a1b26);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui;
+  }
+
+  .wrap {
+    padding: 14px;
+  }
+
+  .header {
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid rgba(122,162,247,0.2);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(16px);
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .title {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .desc {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .switch {
+    transform: scale(1.1);
+  }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #7dcfff);
+    color: #0f0f14;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .chip {
+    background: rgba(122,162,247,0.15);
+    border: 1px solid rgba(122,162,247,0.25);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .footer {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="title">ChatGPT Approval</div>
+  <div class="wrap">
+    <div class="header">ChatGPT Approval</div>
 
-  <div class="card toggle">
-    <span>Auto Approve</span>
-    <input type="checkbox" id="auto" />
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="title">Auto Approve</div>
+          <div class="desc">Trust allowlist auto click</div>
+        </div>
+        <input type="checkbox" id="auto-approve-toggle" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Tools</div>
+      <input id="tool-input" placeholder="git_status" />
+      <button class="btn" id="add-tool-btn">Add Tool</button>
+      <div id="chips-list-tools" class="chips"></div>
+    </div>
+
+    <div class="card">
+      <div class="title">Servers</div>
+      <input id="server-input" placeholder="MCP Server" />
+      <button class="btn" id="add-server-btn">Add Server</button>
+      <div id="chips-list-servers" class="chips"></div>
+    </div>
+
+    <div class="card">
+      <div class="title">Connectors</div>
+      <input id="connector-input" placeholder="GitHub" />
+      <button class="btn" id="add-connector-btn">Add Connector</button>
+      <div id="chips-list-connectors" class="chips"></div>
+    </div>
+
+    <button class="btn" id="reset-btn">Reset All</button>
+
+    <div class="footer">Tokyo Night iOS Style UI</div>
   </div>
 
-  <button class="btn" id="open">Open Settings</button>
-  <div class="small">Tokyo Night Theme</div>
-</div>
-
-<script>
-const openBtn = document.getElementById('open');
-openBtn.onclick = () => chrome.runtime.openOptionsPage();
-
-const toggle = document.getElementById('auto');
-
-chrome.storage.local.get(['autoApprove'], (d) => {
-  toggle.checked = !!d.autoApprove;
-});
-
-toggle.addEventListener('change', () => {
-  chrome.storage.local.set({ autoApprove: toggle.checked });
-});
-</script>
+  <script src="options.js"></script>
 </body>
 </html>
