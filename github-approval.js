@@ -1,39 +1,15 @@
 // Auto-approve ChatGPT GitHub connector permission dialogs when autoApprove is enabled
 // and GitHub is present in the connector allowlist.
 
+const GithubDom = globalThis.ApprovalHelperDom;
+const GithubStorage = globalThis.ApprovalHelperStorage;
+const GithubClicker = globalThis.ApprovalHelperClicker;
+
 const githubHandledDialogs = new WeakSet();
 const githubPendingDialogs = new WeakSet();
 
-function getGithubVisibleText(el) {
-  return (el?.innerText || el?.textContent || "").trim();
-}
-
-function getGithubAccessibleText(el) {
-  return [
-    getGithubVisibleText(el),
-    el?.getAttribute?.("aria-label") || "",
-    el?.getAttribute?.("title") || ""
-  ].join(" ").trim();
-}
-
-function normalizeGithubText(text) {
-  return (text || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function isGithubElementVisible(el) {
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  const style = window.getComputedStyle(el);
-  return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.visibility !== "hidden" &&
-    style.display !== "none"
-  );
-}
+let githubAutoApprove = false;
+let githubConnectorTrusted = true;
 
 function hasTrustedGithubConnector(connectors) {
   if (connectors === undefined) return true;
@@ -41,28 +17,16 @@ function hasTrustedGithubConnector(connectors) {
   return connectors.some(connector => String(connector).trim().toLowerCase() === "github");
 }
 
-async function isGithubAutoApproveEnabled() {
-  try {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      const data = await chrome.storage.local.get(["autoApprove", "trustedConnectors"]);
-      return data.autoApprove === true && hasTrustedGithubConnector(data.trustedConnectors);
-    }
-  } catch (error) {
-    console.error("[GitHub Approval Helper] Failed to read autoApprove setting:", error);
-  }
-
-  try {
-    const fallback = JSON.parse(localStorage.getItem("mcp_approval_settings_fallback_v2") || "{}");
-    return fallback.autoApprove === true && hasTrustedGithubConnector(fallback.trustedConnectors);
-  } catch {
-    return false;
-  }
+async function refreshGithubSettings() {
+  const settings = await GithubStorage.getSettings();
+  githubAutoApprove = settings.autoApprove === true;
+  githubConnectorTrusted = hasTrustedGithubConnector(settings.trustedConnectors);
 }
 
 function isGithubApprovalText(text) {
   if (!text) return false;
 
-  const normalized = normalizeGithubText(text);
+  const normalized = GithubDom.normalizeText(text);
   const compact = normalized.replace(/\s+/g, "");
 
   if (compact.includes("允許chatgpt使用github")) return true;
@@ -71,21 +35,15 @@ function isGithubApprovalText(text) {
 
   const hasGithub = normalized.includes("github");
   const hasChatGPT = normalized.includes("chatgpt") || normalized.includes("chat gpt");
-  const hasUseIntent =
-    normalized.includes("use") ||
-    normalized.includes("connect") ||
-    normalized.includes("authorize") ||
-    text.includes("使用") ||
-    text.includes("連接") ||
-    text.includes("授權");
-  const hasAllowIntent =
+  const hasPermissionIntent =
     normalized.includes("allow") ||
     normalized.includes("approve") ||
+    normalized.includes("authorize") ||
     text.includes("允許") ||
     text.includes("同意") ||
     text.includes("授權");
 
-  return hasGithub && hasChatGPT && (hasUseIntent || hasAllowIntent);
+  return hasGithub && hasChatGPT && hasPermissionIntent;
 }
 
 function findGithubApprovalDialog() {
@@ -98,30 +56,15 @@ function findGithubApprovalDialog() {
 
   const dialogs = Array.from(document.querySelectorAll(dialogSelectors));
   for (const dialog of dialogs) {
-    if (!isGithubElementVisible(dialog)) continue;
-    const text = getGithubVisibleText(dialog);
-    if (isGithubApprovalText(text)) return dialog;
-  }
-
-  const candidates = Array.from(document.querySelectorAll("button, [role='button']"));
-  for (const candidate of candidates) {
-    if (!isGithubElementVisible(candidate)) continue;
-    if (!isGithubAllowButtonText(getGithubAccessibleText(candidate))) continue;
-
-    let parent = candidate.parentElement;
-    let depth = 0;
-    while (parent && depth < 10) {
-      if (isGithubApprovalText(getGithubVisibleText(parent))) return parent;
-      parent = parent.parentElement;
-      depth += 1;
-    }
+    if (!GithubDom.isElementVisible(dialog)) continue;
+    if (isGithubApprovalText(GithubDom.getVisibleText(dialog))) return dialog;
   }
 
   return null;
 }
 
 function isGithubRejectButtonText(text) {
-  const normalized = normalizeGithubText(text);
+  const normalized = GithubDom.normalizeText(text);
   return (
     normalized.includes("cancel") ||
     normalized.includes("dismiss") ||
@@ -134,126 +77,52 @@ function isGithubRejectButtonText(text) {
   );
 }
 
-function isGithubAllowButtonText(text) {
-  if (!text || isGithubRejectButtonText(text)) return false;
-
-  const normalized = normalizeGithubText(text);
-  return (
-    normalized === "allow" ||
-    normalized === "approve" ||
-    normalized === "authorize" ||
-    normalized === "connect" ||
-    normalized === "continue" ||
-    normalized.includes("always allow") ||
-    normalized.includes("allow") ||
-    normalized.includes("approve") ||
-    normalized.includes("authorize") ||
-    normalized.includes("connect") ||
-    text.includes("允許") ||
-    text.includes("一律允許") ||
-    text.includes("同意") ||
-    text.includes("授權") ||
-    text.includes("連接") ||
-    text.includes("繼續")
-  );
-}
-
 function scoreGithubAllowButton(button) {
-  const text = getGithubAccessibleText(button);
-  const normalized = normalizeGithubText(text);
+  const text = GithubDom.getAccessibleText(button);
+  if (!text || isGithubRejectButtonText(text)) return 0;
+
+  const normalized = GithubDom.normalizeText(text);
 
   if (normalized.includes("always allow") || text.includes("一律允許") || text.includes("一律同意")) return 100;
   if (normalized === "allow" || text === "允許") return 90;
   if (normalized === "authorize" || text === "授權") return 80;
-  if (normalized === "connect" || text === "連接") return 70;
-  if (normalized === "continue" || text === "繼續") return 60;
-  if (isGithubAllowButtonText(text)) return 50;
+  if (normalized.includes("allow") || text.includes("允許")) return 70;
+  if (normalized.includes("authorize") || text.includes("授權")) return 60;
+
   return 0;
 }
 
 function findGithubAllowButton(dialog) {
   const buttons = Array.from(dialog.querySelectorAll("button, [role='button']"))
-    .filter(isGithubElementVisible)
-    .filter(button => isGithubAllowButtonText(getGithubAccessibleText(button)))
-    .sort((a, b) => scoreGithubAllowButton(b) - scoreGithubAllowButton(a));
+    .filter(GithubDom.isElementVisible)
+    .map(button => ({ button, score: scoreGithubAllowButton(button) }))
+    .filter(entry => entry.score > 0)
+    .sort((a, b) => b.score - a.score);
 
-  return buttons[0] || null;
-}
-
-function isGithubButtonEnabled(button) {
-  if (!button) return false;
-  if (button.disabled) return false;
-  if (button.getAttribute("aria-disabled") === "true") return false;
-
-  const style = window.getComputedStyle(button);
-  if (style.pointerEvents === "none") return false;
-
-  return true;
-}
-
-function clickGithubButton(button) {
-  if (!button) return;
-
-  const rect = button.getBoundingClientRect();
-  const eventInit = {
-    bubbles: true,
-    cancelable: true,
-    view: window,
-    clientX: rect.left + rect.width / 2,
-    clientY: rect.top + rect.height / 2
-  };
-
-  ["pointerdown", "mousedown", "pointerup", "mouseup", "click"].forEach(eventName => {
-    button.dispatchEvent(new MouseEvent(eventName, eventInit));
-  });
-
-  button.click();
-}
-
-function logGithubApproval() {
-  const key = "mcpApprovalHelperLog";
-  try {
-    const oldLog = JSON.parse(localStorage.getItem(key) || "[]");
-    oldLog.push({
-      toolName: "GitHub",
-      trusted: true,
-      time: new Date().toISOString(),
-      url: location.href
-    });
-    localStorage.setItem(key, JSON.stringify(oldLog.slice(-200)));
-  } catch (error) {
-    console.error("[GitHub Approval Helper] Failed to write audit log:", error);
-  }
+  return buttons[0]?.button || null;
 }
 
 function autoApproveGithubWithRetry(dialog) {
   if (githubPendingDialogs.has(dialog) || githubHandledDialogs.has(dialog)) return;
   githubPendingDialogs.add(dialog);
 
-  const delaySequence = [100, 300, 700, 1200, 2000, 3500, 5500, 8000, 12000, 18000, 25000, 30000];
-
-  delaySequence.forEach((delay, index) => {
-    setTimeout(() => {
-      if (!document.body.contains(dialog) || githubHandledDialogs.has(dialog)) return;
-
-      const allowButton = findGithubAllowButton(dialog);
-      if (!allowButton || !isGithubButtonEnabled(allowButton)) {
-        if (index === delaySequence.length - 1) githubPendingDialogs.delete(dialog);
-        return;
-      }
-
+  GithubClicker.clickWithRetry({
+    dialog,
+    findButton: findGithubAllowButton,
+    isEnabled: GithubDom.isButtonEnabled,
+    click: GithubDom.simulateRealClick,
+    onSuccess: () => {
       githubHandledDialogs.add(dialog);
       githubPendingDialogs.delete(dialog);
-      logGithubApproval();
+      GithubStorage.logApproval({ toolName: "GitHub", trusted: true });
       console.log("[GitHub Approval Helper] Auto-approving ChatGPT GitHub connector permission.");
-      clickGithubButton(allowButton);
-    }, delay);
+    },
+    onExhausted: () => githubPendingDialogs.delete(dialog)
   });
 }
 
 async function scanGithubApproval() {
-  const autoApprove = await isGithubAutoApproveEnabled();
-  if (!autoApprove) return;
+  if (!githubAutoApprove || !githubConnectorTrusted) return;
 
   const dialog = findGithubApprovalDialog();
   if (!dialog || githubHandledDialogs.has(dialog)) return;
@@ -279,14 +148,15 @@ githubObserver.observe(document.documentElement, {
   subtree: true
 });
 
-if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
-  chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === "local" && (changes.autoApprove || changes.trustedConnectors)) throttleGithubScan();
-  });
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", throttleGithubScan, { once: true });
-} else {
+GithubStorage.onSettingsChanged(async () => {
+  await refreshGithubSettings();
   throttleGithubScan();
-}
+});
+
+refreshGithubSettings().then(() => {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", throttleGithubScan, { once: true });
+  } else {
+    throttleGithubScan();
+  }
+});
