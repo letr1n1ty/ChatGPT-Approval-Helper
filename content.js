@@ -9,16 +9,40 @@
     return;
   }
 
-  const approvedDialogs = new WeakSet();
-  const pendingDialogs = new WeakSet();
+  const APPROVAL_KIND = Object.freeze({
+    CONNECTOR: "connector",
+    SERVER: "server",
+    TOOL: "tool",
+    UNKNOWN: "unknown"
+  });
+
+  const KNOWN_CONNECTORS = Object.freeze([
+    { name: "GitHub", aliases: ["github"] },
+    { name: "Google Drive", aliases: ["google drive", "googledrive", "drive"] },
+    { name: "Gmail", aliases: ["gmail", "google mail"] },
+    { name: "Google Calendar", aliases: ["google calendar", "calendar"] },
+    { name: "Notion", aliases: ["notion"] },
+    { name: "Slack", aliases: ["slack"] },
+    { name: "Dropbox", aliases: ["dropbox"] },
+    { name: "Microsoft OneDrive", aliases: ["microsoft onedrive", "onedrive", "one drive"] }
+  ]);
+
+  const handledApprovals = new WeakSet();
+  const pendingApprovals = new WeakSet();
 
   let settings = Defaults.getDefaultSettings();
   let trustedTools = new Set(settings.trustedTools);
   let trustedServers = new Set(settings.trustedServers);
+  let trustedConnectors = new Set(settings.trustedConnectors);
+
+  function normalizeForCompare(value) {
+    return Dom.normalizeText(value).replace(/[^a-z0-9]+/g, "");
+  }
 
   function refreshDerivedSettings() {
     trustedTools = new Set(settings.trustedTools || []);
     trustedServers = new Set(settings.trustedServers || []);
+    trustedConnectors = new Set(settings.trustedConnectors || []);
   }
 
   async function refreshSettings() {
@@ -26,19 +50,57 @@
     refreshDerivedSettings();
   }
 
-  async function saveTrustedValue(key, value) {
-    if (!value) return;
+  async function saveTrustedValue(kind, value) {
+    if (!value || kind === APPROVAL_KIND.UNKNOWN) return;
+
+    const keyByKind = {
+      [APPROVAL_KIND.CONNECTOR]: "trustedConnectors",
+      [APPROVAL_KIND.SERVER]: "trustedServers",
+      [APPROVAL_KIND.TOOL]: "trustedTools"
+    };
+    const key = keyByKind[kind];
+    if (!key) return;
+
+    const existing = settings[key] || [];
+    const existingNormalized = new Set(existing.map(normalizeForCompare));
+    const nextValues = existingNormalized.has(normalizeForCompare(value))
+      ? existing
+      : [...existing, value];
+
     const nextSettings = Defaults.normalizeSettings({
       ...settings,
-      [key]: [...new Set([...(settings[key] || []), value])]
+      [key]: nextValues
     });
+
     settings = await Storage.saveSettings(nextSettings);
     refreshDerivedSettings();
     scan();
   }
 
+  function textContainsName(text, name) {
+    if (!text || !name) return false;
+    const normalizedText = Dom.normalizeText(text);
+    const normalizedName = Dom.normalizeText(name);
+    return normalizedText.includes(normalizedName);
+  }
+
+  function textContainsNameLoose(text, name) {
+    if (!text || !name) return false;
+    return normalizeForCompare(text).includes(normalizeForCompare(name));
+  }
+
+  function hasTrustedValue(collection, value, { loose = false } = {}) {
+    if (!value) return false;
+    if (!loose) return collection.has(value);
+
+    const normalizedValue = normalizeForCompare(value);
+    return Array.from(collection).some(item => normalizeForCompare(item) === normalizedValue);
+  }
+
   function isRejectButtonText(text) {
     const normalized = Dom.normalizeText(text);
+    const compact = Dom.compactText(text);
+
     return (
       normalized.includes("cancel") ||
       normalized.includes("dismiss") ||
@@ -46,14 +108,14 @@
       normalized.includes("reject") ||
       normalized.includes("not now") ||
       normalized === "no" ||
-      text.includes("取消") ||
-      text.includes("拒絕") ||
-      text.includes("拒绝") ||
-      text.includes("不要") ||
-      text.includes("稍後") ||
-      text.includes("稍后") ||
-      text.includes("略過") ||
-      text.includes("跳过")
+      compact.includes("取消") ||
+      compact.includes("拒絕") ||
+      compact.includes("拒绝") ||
+      compact.includes("不要") ||
+      compact.includes("稍後") ||
+      compact.includes("稍后") ||
+      compact.includes("略過") ||
+      compact.includes("跳过")
     );
   }
 
@@ -64,18 +126,20 @@
     const normalized = Dom.normalizeText(text);
     const compact = Dom.compactText(text);
 
-    if (normalized.includes("always allow") || compact.includes("一律允許") || compact.includes("一律允许") || compact.includes("一律同意")) return 120;
-    if (normalized === "allow" || compact === "允許" || compact === "允许") return 110;
-    if (normalized === "approve" || compact === "核准" || compact === "批准") return 105;
-    if (normalized === "authorize" || compact === "授權" || compact === "授权") return 100;
-    if (normalized === "run" || compact === "執行" || compact === "执行") return 95;
+    if (normalized.includes("always allow") || compact.includes("一律允許") || compact.includes("一律允许") || compact.includes("一律同意")) return 130;
+    if (normalized === "allow" || compact === "允許" || compact === "允许") return 120;
+    if (normalized === "approve" || compact === "核准" || compact === "批准") return 115;
+    if (normalized === "authorize" || compact === "授權" || compact === "授权") return 110;
+    if (normalized === "connect" || compact === "連接" || compact === "连接") return 105;
+    if (normalized === "run" || compact === "執行" || compact === "执行") return 100;
     if (normalized === "continue" || compact === "繼續" || compact === "继续") return 85;
     if (normalized === "confirm" || compact === "確認" || compact === "确认") return 80;
     if (normalized.includes("allow") || compact.includes("允許") || compact.includes("允许") || compact.includes("同意")) return 75;
     if (normalized.includes("approve") || compact.includes("核准") || compact.includes("批准")) return 72;
     if (normalized.includes("authorize") || compact.includes("授權") || compact.includes("授权")) return 70;
+    if (normalized.includes("connect") || compact.includes("連接") || compact.includes("连接")) return 68;
     if (normalized.includes("run") || normalized.includes("execute") || compact.includes("執行") || compact.includes("执行")) return 65;
-    if (normalized.includes("continue") || compact.includes("繼續") || compact.includes("继续")) return 55;
+    if (normalized.includes("continue") || compact.includes("繼續") || compact.includes("继续")) return 52;
 
     return 0;
   }
@@ -90,10 +154,6 @@
     return buttons[0]?.button || null;
   }
 
-  function hasKnownTrustedName(text) {
-    return [...trustedTools, ...trustedServers].some(name => name && text.includes(name));
-  }
-
   function hasApprovalIntent(text) {
     const normalized = Dom.normalizeText(text);
     const compact = Dom.compactText(text);
@@ -102,7 +162,9 @@
       normalized.includes("allow") ||
       normalized.includes("approve") ||
       normalized.includes("authorize") ||
+      normalized.includes("connect") ||
       normalized.includes("permission") ||
+      normalized.includes("access") ||
       normalized.includes("use") ||
       normalized.includes("run") ||
       normalized.includes("execute") ||
@@ -113,46 +175,107 @@
       compact.includes("授权") ||
       compact.includes("核准") ||
       compact.includes("批准") ||
+      compact.includes("連接") ||
+      compact.includes("连接") ||
+      compact.includes("存取") ||
       compact.includes("使用") ||
       compact.includes("執行") ||
       compact.includes("执行")
     );
   }
 
-  function hasApprovalTargetSignal(text) {
+  function hasCommandLikeSignal(text) {
     const normalized = Dom.normalizeText(text);
     const compact = Dom.compactText(text);
 
     return (
-      hasKnownTrustedName(text) ||
-      normalized.includes("mcp") ||
-      normalized.includes("tool") ||
-      normalized.includes("server") ||
+      /\b[a-zA-Z_][a-zA-Z0-9_]*_[a-zA-Z0-9_]+\b/.test(text) ||
+      /\bgit\s+(status|diff|commit|push|pull|checkout|branch|log|show|add|reset|restore)\b/i.test(text) ||
       normalized.includes("terminal") ||
       normalized.includes("shell") ||
       normalized.includes("command") ||
       normalized.includes("python") ||
       normalized.includes("node") ||
       normalized.includes("npm") ||
-      normalized.includes("git") ||
-      compact.includes("工具") ||
-      compact.includes("伺服器") ||
-      compact.includes("服务器") ||
       compact.includes("終端機") ||
       compact.includes("终端") ||
       compact.includes("命令")
     );
   }
 
-  function isApprovalRoot(root) {
+  function getMatchedConnector(text) {
+    const configuredConnectors = Array.from(trustedConnectors).map(name => ({ name, aliases: [name] }));
+    const candidates = [...configuredConnectors, ...KNOWN_CONNECTORS];
+    const seen = new Set();
+
+    for (const connector of candidates) {
+      const normalizedName = normalizeForCompare(connector.name);
+      if (!normalizedName || seen.has(normalizedName)) continue;
+      seen.add(normalizedName);
+
+      const aliases = [connector.name, ...(connector.aliases || [])];
+      if (aliases.some(alias => textContainsNameLoose(text, alias))) {
+        return connector.name;
+      }
+    }
+
+    return null;
+  }
+
+  function hasConnectorIntent(text) {
+    const normalized = Dom.normalizeText(text);
+    const compact = Dom.compactText(text);
+
+    return (
+      normalized.includes("connector") ||
+      normalized.includes("connect") ||
+      normalized.includes("authorize") ||
+      normalized.includes("allow") ||
+      normalized.includes("permission") ||
+      normalized.includes("access") ||
+      normalized.includes("use") ||
+      compact.includes("連接") ||
+      compact.includes("连接") ||
+      compact.includes("授權") ||
+      compact.includes("授权") ||
+      compact.includes("允許") ||
+      compact.includes("允许") ||
+      compact.includes("權限") ||
+      compact.includes("权限") ||
+      compact.includes("存取") ||
+      compact.includes("使用")
+    );
+  }
+
+  function hasTargetSignal(text) {
+    const normalized = Dom.normalizeText(text);
+    const compact = Dom.compactText(text);
+
+    return (
+      Boolean(getMatchedConnector(text)) ||
+      Array.from(trustedServers).some(name => textContainsName(text, name)) ||
+      Array.from(trustedTools).some(name => textContainsName(text, name)) ||
+      normalized.includes("mcp") ||
+      normalized.includes("tool") ||
+      normalized.includes("server") ||
+      hasCommandLikeSignal(text) ||
+      compact.includes("工具") ||
+      compact.includes("伺服器") ||
+      compact.includes("服务器")
+    );
+  }
+
+  function isApprovalCandidate(root) {
     if (!root || !Dom.isElementVisible(root)) return false;
+
     const text = Dom.getVisibleText(root);
-    if (!text || text.length < 6) return false;
-    if (!hasApprovalIntent(text) || !hasApprovalTargetSignal(text)) return false;
+    if (!text || text.length < 4) return false;
+    if (!hasApprovalIntent(text) || !hasTargetSignal(text)) return false;
+
     return Boolean(findApprovalButton(root));
   }
 
-  function getDialogCandidates() {
+  function getApprovalCandidates() {
     const explicitCandidates = Dom.queryAllDeep([
       '[role="dialog"]',
       '[aria-modal="true"]',
@@ -168,12 +291,8 @@
       .flatMap(button => Dom.getComposedParents(button, 10));
 
     return Array.from(new Set([...explicitCandidates, ...buttonParentCandidates]))
-      .filter(Dom.isElementVisible)
+      .filter(isApprovalCandidate)
       .sort((a, b) => Dom.getVisibleText(a).length - Dom.getVisibleText(b).length);
-  }
-
-  function findApprovalDialog() {
-    return getDialogCandidates().find(isApprovalRoot) || null;
   }
 
   function cleanCandidateName(value) {
@@ -185,73 +304,202 @@
       .trim();
   }
 
-  function inferTypeFromName(name, text) {
-    const normalizedName = Dom.normalizeText(name);
-    const normalizedText = Dom.normalizeText(text);
-
-    if (trustedServers.has(name) || normalizedName.includes("mcp") || normalizedText.includes("mcp server")) return "server";
-    if (trustedTools.has(name) || name.includes("_")) return "tool";
-    return normalizedText.includes("server") || text.includes("伺服器") || text.includes("服务器") ? "server" : "tool";
-  }
-
-  function extractNameFromCode(dialog, text) {
-    const codeLikeElements = Dom.queryAllDeep("code, kbd, samp, pre, [data-testid*='tool' i], [data-testid*='server' i]", dialog)
+  function extractCodeLikeName(root, text) {
+    const codeLikeElements = Dom.queryAllDeep([
+      "code",
+      "kbd",
+      "samp",
+      "pre",
+      "[data-testid*='tool' i]",
+      "[data-testid*='server' i]",
+      "[data-testid*='command' i]"
+    ].join(", "), root)
       .filter(Dom.isElementVisible)
       .map(Dom.getVisibleText)
       .map(cleanCandidateName)
       .filter(Boolean);
 
-    const codeName = codeLikeElements.find(value =>
-      trustedTools.has(value) ||
-      trustedServers.has(value) ||
+    return codeLikeElements.find(value =>
+      Array.from(trustedTools).some(name => name === value) ||
+      Array.from(trustedServers).some(name => name === value) ||
       /^MCP\b/i.test(value) ||
-      /^[a-zA-Z_][a-zA-Z0-9_]{2,}$/.test(value)
-    );
-
-    if (!codeName) return null;
-    return { name: codeName, type: inferTypeFromName(codeName, text) };
+      /^[a-zA-Z_][a-zA-Z0-9_]{2,}$/.test(value) ||
+      /^git\s+(status|diff|commit|push|pull|checkout|branch|log|show|add|reset|restore)$/i.test(value)
+    ) || null;
   }
 
-  function extractToolName(dialog) {
-    const text = Dom.getVisibleText(dialog);
+  function detectConnector(root) {
+    const text = Dom.getVisibleText(root);
+    const connectorName = getMatchedConnector(text);
+    if (!connectorName || !hasConnectorIntent(text)) return null;
 
-    for (const server of trustedServers) {
-      if (server && text.includes(server)) return { name: server, type: "server" };
-    }
-    for (const tool of trustedTools) {
-      if (tool && text.includes(tool)) return { name: tool, type: "tool" };
+    return {
+      kind: APPROVAL_KIND.CONNECTOR,
+      name: connectorName,
+      title: "Connector",
+      policyKey: "trustedConnectors",
+      button: findApprovalButton(root),
+      root
+    };
+  }
+
+  function detectMcpServer(root) {
+    const text = Dom.getVisibleText(root);
+    const normalized = Dom.normalizeText(text);
+    const compact = Dom.compactText(text);
+
+    const explicitServer = Array.from(trustedServers).find(name => textContainsName(text, name));
+    if (explicitServer) {
+      return {
+        kind: APPROVAL_KIND.SERVER,
+        name: explicitServer,
+        title: "MCP Server",
+        policyKey: "trustedServers",
+        button: findApprovalButton(root),
+        root
+      };
     }
 
-    const codeMatch = extractNameFromCode(dialog, text);
-    if (codeMatch) return codeMatch;
+    const hasServerSignal = normalized.includes("mcp") || normalized.includes("server") || compact.includes("伺服器") || compact.includes("服务器");
+    if (!hasServerSignal) return null;
+
+    const codeLikeName = extractCodeLikeName(root, text);
+    if (codeLikeName && /^MCP\b/i.test(codeLikeName)) {
+      return {
+        kind: APPROVAL_KIND.SERVER,
+        name: codeLikeName,
+        title: "MCP Server",
+        policyKey: "trustedServers",
+        button: findApprovalButton(root),
+        root
+      };
+    }
 
     const patterns = [
-      /(?:allow|approve|authorize|use|run|execute)\s+(?:the\s+)?(?:mcp\s+server|server|tool|command)?\s*["'`“”]?([a-zA-Z_][a-zA-Z0-9_\-\s]{2,80})["'`“”]?/i,
-      /(?:允許|允许|同意|授權|授权|核准|批准|使用|執行|执行)\s*(?:MCP\s*)?(?:伺服器|服务器|工具|命令)?\s*[「『“”\"'`]?([a-zA-Z_][a-zA-Z0-9_\-\s]{2,80})[」』“”\"'`]?/,
       /\b(MCP\s+[a-zA-Z0-9][a-zA-Z0-9_\-\s]{2,80})\b/,
-      /\b([a-zA-Z_][a-zA-Z0-9_]{2,})\b/g
+      /(?:mcp\s+server|server)\s*["'`“”]?([a-zA-Z0-9][a-zA-Z0-9_\-\s]{2,80})["'`“”]?/i,
+      /(?:MCP\s*)?(?:伺服器|服务器)\s*[「『“”\"'`]?([a-zA-Z0-9][a-zA-Z0-9_\-\s]{2,80})[」』“”\"'`]?/
     ];
 
     for (const pattern of patterns) {
-      if (pattern.global) {
-        const matches = Array.from(text.matchAll(pattern));
-        const token = matches
-          .map(match => cleanCandidateName(match[1]))
-          .find(value => value.includes("_") && !["read_only", "tool_call", "tool_calls"].includes(value.toLowerCase()));
-        if (token) return { name: token, type: "tool" };
-        continue;
-      }
-
       const match = text.match(pattern);
-      const extracted = cleanCandidateName(match?.[1]);
-      if (extracted) return { name: extracted, type: inferTypeFromName(extracted, text) };
+      const name = cleanCandidateName(match?.[1]);
+      if (name) {
+        return {
+          kind: APPROVAL_KIND.SERVER,
+          name,
+          title: "MCP Server",
+          policyKey: "trustedServers",
+          button: findApprovalButton(root),
+          root
+        };
+      }
     }
 
-    return { name: null, type: "unknown" };
+    return null;
   }
 
-  function escapeHTML(value) {
-    return Dom.escapeHTML(value);
+  function detectApiTool(root) {
+    const text = Dom.getVisibleText(root);
+    const normalized = Dom.normalizeText(text);
+    const compact = Dom.compactText(text);
+
+    const explicitTool = Array.from(trustedTools).find(name => textContainsName(text, name));
+    if (explicitTool) {
+      return {
+        kind: APPROVAL_KIND.TOOL,
+        name: explicitTool,
+        title: "API Tool",
+        policyKey: "trustedTools",
+        button: findApprovalButton(root),
+        root
+      };
+    }
+
+    const codeLikeName = extractCodeLikeName(root, text);
+    if (codeLikeName && !/^MCP\b/i.test(codeLikeName)) {
+      const normalizedCodeName = Dom.normalizeText(codeLikeName);
+      const name = normalizedCodeName.startsWith("git ") ? codeLikeName.replace(/\s+/g, "_") : codeLikeName;
+      return {
+        kind: APPROVAL_KIND.TOOL,
+        name,
+        title: "API Tool",
+        policyKey: "trustedTools",
+        button: findApprovalButton(root),
+        root
+      };
+    }
+
+    const hasToolSignal = normalized.includes("tool") || normalized.includes("command") || normalized.includes("run") || normalized.includes("execute") || compact.includes("工具") || compact.includes("命令") || hasCommandLikeSignal(text);
+    if (!hasToolSignal) return null;
+
+    const tokenMatches = Array.from(text.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]{2,})\b/g))
+      .map(match => cleanCandidateName(match[1]))
+      .filter(value => value.includes("_"))
+      .filter(value => !["read_only", "tool_call", "tool_calls"].includes(value.toLowerCase()));
+
+    if (tokenMatches.length) {
+      return {
+        kind: APPROVAL_KIND.TOOL,
+        name: tokenMatches[0],
+        title: "API Tool",
+        policyKey: "trustedTools",
+        button: findApprovalButton(root),
+        root
+      };
+    }
+
+    const gitCommandMatch = text.match(/\bgit\s+(status|diff|commit|push|pull|checkout|branch|log|show|add|reset|restore)\b/i);
+    if (gitCommandMatch) {
+      return {
+        kind: APPROVAL_KIND.TOOL,
+        name: `git_${gitCommandMatch[1].toLowerCase()}`,
+        title: "API Tool",
+        policyKey: "trustedTools",
+        button: findApprovalButton(root),
+        root
+      };
+    }
+
+    return null;
+  }
+
+  const DETECTORS = Object.freeze([
+    detectConnector,
+    detectMcpServer,
+    detectApiTool
+  ]);
+
+  function detectApproval(root) {
+    for (const detector of DETECTORS) {
+      const result = detector(root);
+      if (result) return result;
+    }
+
+    return {
+      kind: APPROVAL_KIND.UNKNOWN,
+      name: null,
+      title: "Approval Item",
+      policyKey: null,
+      button: findApprovalButton(root),
+      root
+    };
+  }
+
+  function isTrustedTarget(target) {
+    if (!target?.name) return false;
+
+    if (target.kind === APPROVAL_KIND.CONNECTOR) {
+      return hasTrustedValue(trustedConnectors, target.name, { loose: true });
+    }
+    if (target.kind === APPROVAL_KIND.SERVER) {
+      return trustedServers.has(target.name);
+    }
+    if (target.kind === APPROVAL_KIND.TOOL) {
+      return trustedTools.has(target.name);
+    }
+
+    return false;
   }
 
   function ensureApprovalHelperStyles() {
@@ -282,12 +530,10 @@
         transition: opacity 180ms ease, transform 180ms ease;
         pointer-events: auto;
       }
-
       #mcp-approval-helper-badge.mcp-helper-visible {
         opacity: 1;
         transform: translateY(0) scale(1);
       }
-
       .mcp-helper-card { padding: 14px; }
       .mcp-helper-top { display: flex; align-items: center; gap: 12px; }
       .mcp-helper-icon {
@@ -340,7 +586,21 @@
     document.documentElement.appendChild(style);
   }
 
-  function showBadge(dialog, name, type, trusted) {
+  function getTypeText(target) {
+    if (target.kind === APPROVAL_KIND.CONNECTOR) return "Connector";
+    if (target.kind === APPROVAL_KIND.SERVER) return "MCP Server";
+    if (target.kind === APPROVAL_KIND.TOOL) return "API Tool";
+    return "Approval Item";
+  }
+
+  function getTrustActionLabel(target) {
+    if (target.kind === APPROVAL_KIND.CONNECTOR) return "Trust this connector";
+    if (target.kind === APPROVAL_KIND.SERVER) return "Trust this MCP server";
+    if (target.kind === APPROVAL_KIND.TOOL) return "Trust this API tool";
+    return "Trust this item";
+  }
+
+  function showBadge(target, trusted) {
     ensureApprovalHelperStyles();
 
     let badge = document.getElementById("mcp-approval-helper-badge");
@@ -351,17 +611,16 @@
       requestAnimationFrame(() => badge.classList.add("mcp-helper-visible"));
     }
 
-    const typeText = type === "server" ? "MCP Server" : type === "tool" ? "API Tool" : "Approval Item";
-    const safeName = escapeHTML(name || "Unknown");
+    const typeText = getTypeText(target);
+    const safeName = Dom.escapeHTML(target.name || "Unknown");
     const title = trusted ? `Trusted ${typeText}` : `Review ${typeText}`;
     const subtitle = trusted
       ? "This item is in your allowlist. Auto-approval can run when enabled."
       : "This item is not in your allowlist. Manual confirmation is required.";
     const icon = trusted ? "✓" : "!";
     const iconClass = trusted ? "trusted" : "untrusted";
-    const actionLabel = type === "server" ? "Trust this MCP server" : "Trust this API tool";
-    const actionHtml = !trusted && name && type !== "unknown"
-      ? `<div class="mcp-helper-actions"><button id="mcp-helper-trust-btn" type="button">${actionLabel}</button></div>`
+    const actionHtml = !trusted && target.name && target.kind !== APPROVAL_KIND.UNKNOWN
+      ? `<div class="mcp-helper-actions"><button id="mcp-helper-trust-btn" type="button">${getTrustActionLabel(target)}</button></div>`
       : "";
 
     badge.innerHTML = `
@@ -380,20 +639,18 @@
       </div>
     `;
 
-    dialog.dataset.mcpApprovalHelperOutline = "true";
-    dialog.style.outline = trusted ? "2px solid rgba(158, 206, 106, 0.88)" : "2px solid rgba(247, 118, 142, 0.88)";
-    dialog.style.outlineOffset = "3px";
-    dialog.style.boxShadow = trusted
+    target.root.dataset.mcpApprovalHelperOutline = "true";
+    target.root.style.outline = trusted ? "2px solid rgba(158, 206, 106, 0.88)" : "2px solid rgba(247, 118, 142, 0.88)";
+    target.root.style.outlineOffset = "3px";
+    target.root.style.boxShadow = trusted
       ? "0 0 0 6px rgba(158, 206, 106, 0.12), 0 22px 70px rgba(0, 0, 0, 0.28)"
       : "0 0 0 6px rgba(247, 118, 142, 0.12), 0 22px 70px rgba(0, 0, 0, 0.28)";
 
-    if (!trusted && name && type !== "unknown") {
+    if (!trusted && target.name && target.kind !== APPROVAL_KIND.UNKNOWN) {
       setTimeout(() => {
         const trustButton = document.getElementById("mcp-helper-trust-btn");
         if (!trustButton) return;
-        trustButton.onclick = async () => {
-          await saveTrustedValue(type === "server" ? "trustedServers" : "trustedTools", name);
-        };
+        trustButton.onclick = async () => saveTrustedValue(target.kind, target.name);
       }, 0);
     }
   }
@@ -413,95 +670,108 @@
     });
   }
 
-  function isTrustedTarget({ name, type }) {
-    if (!name) return false;
-    if (type === "server") return trustedServers.has(name);
-    if (type === "tool") return trustedTools.has(name);
-    return false;
+  function logTargetApproval(target, trusted) {
+    Storage.logApproval({
+      toolName: target.name || getTypeText(target),
+      trusted,
+      url: location.href
+    });
   }
 
-  function autoApproveWithRetry(dialog, target) {
-    if (pendingDialogs.has(dialog) || approvedDialogs.has(dialog)) return;
-    pendingDialogs.add(dialog);
+  function autoApproveWithRetry(target) {
+    if (!target.root || pendingApprovals.has(target.root) || handledApprovals.has(target.root)) return;
+    pendingApprovals.add(target.root);
 
     Clicker.clickWithRetry({
-      dialog,
+      dialog: target.root,
       findButton: findApprovalButton,
       isEnabled: Dom.isButtonEnabled,
       click: Dom.simulateRealClick,
       onClick: (_button, meta) => {
-        console.log(`[Approval Helper] Attempting to approve ${target.name} (${meta.index + 1}, ${meta.delay}ms)`);
+        console.log(`[Approval Helper] Attempting to approve ${target.kind}:${target.name} (${meta.index + 1}, ${meta.delay}ms).`);
       },
       onSuccess: () => {
-        pendingDialogs.delete(dialog);
-        approvedDialogs.add(dialog);
-        Storage.logApproval({ toolName: target.name, trusted: true });
-        console.log(`[Approval Helper] Approved ${target.name}.`);
+        pendingApprovals.delete(target.root);
+        handledApprovals.add(target.root);
+        logTargetApproval(target, true);
+        console.log(`[Approval Helper] Approved ${target.kind}:${target.name}.`);
       },
       onExhausted: reason => {
-        pendingDialogs.delete(dialog);
-        console.warn(`[Approval Helper] Approval retry exhausted for ${target.name}: ${reason}`);
+        pendingApprovals.delete(target.root);
+        console.warn(`[Approval Helper] Approval retry exhausted for ${target.kind}:${target.name}: ${reason}`);
       }
     });
   }
 
-  function scan() {
-    const dialog = findApprovalDialog();
+  function getCurrentApproval() {
+    const candidates = getApprovalCandidates();
+    for (const candidate of candidates) {
+      const target = detectApproval(candidate);
+      if (target?.button) return target;
+    }
+    return null;
+  }
 
-    if (!dialog) {
+  function scan() {
+    const target = getCurrentApproval();
+
+    if (!target) {
       removeBadgeAndOutline();
       return;
     }
 
-    const target = extractToolName(dialog);
     const trusted = isTrustedTarget(target);
-
-    showBadge(dialog, target.name, target.type, trusted);
+    showBadge(target, trusted);
 
     if (settings.autoApprove === true && trusted) {
-      autoApproveWithRetry(dialog, target);
+      autoApproveWithRetry(target);
     }
   }
 
   document.addEventListener("keydown", event => {
     if (!(event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "y")) return;
 
-    const dialog = findApprovalDialog();
-    if (!dialog || approvedDialogs.has(dialog)) return;
+    const target = getCurrentApproval();
+    if (!target || handledApprovals.has(target.root)) return;
 
-    const target = extractToolName(dialog);
     const trusted = isTrustedTarget(target);
-
     if (!trusted) {
-      const typeText = target.type === "server" ? "MCP server" : "API tool";
-      const confirmApprove = confirm(`Warning: this ${typeText} [${target.name || "Unknown"}] is not in your allowlist.\n\nApprove it manually?`);
+      const confirmApprove = confirm(`Warning: this ${getTypeText(target)} [${target.name || "Unknown"}] is not in your allowlist.\n\nApprove it manually?`);
       if (!confirmApprove) return;
     }
 
-    const allowButton = findApprovalButton(dialog);
-    if (!allowButton) {
+    if (!target.button) {
       alert("Approval button was not found. Please click it manually.");
       return;
     }
 
-    Storage.logApproval({ toolName: target.name, trusted });
-    Dom.simulateRealClick(allowButton);
+    logTargetApproval(target, trusted);
+    Dom.simulateRealClick(target.button);
   });
 
   let scanPending = false;
-  function throttleScan() {
+  function scheduleScan() {
     if (scanPending) return;
     scanPending = true;
-    requestAnimationFrame(() => {
-      try {
-        scan();
-      } finally {
-        scanPending = false;
+
+    const run = () => {
+      scanPending = false;
+      scan();
+    };
+
+    if (document.hidden) {
+      if (typeof queueMicrotask === "function") {
+        queueMicrotask(run);
+      } else {
+        setTimeout(run, 0);
       }
-    });
+      return;
+    }
+
+    requestAnimationFrame(run);
   }
 
-  const observer = new MutationObserver(throttleScan);
+  const observer = new MutationObserver(scheduleScan);
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
@@ -509,17 +779,21 @@
     attributeFilter: ["aria-disabled", "disabled", "data-state", "data-disabled", "open", "popover"]
   });
 
+  document.addEventListener("visibilitychange", scheduleScan);
+  window.addEventListener("focus", scheduleScan);
+
   Storage.onSettingsChanged(async () => {
     await refreshSettings();
-    throttleScan();
+    scheduleScan();
   });
 
   refreshSettings().then(() => {
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", throttleScan, { once: true });
+      document.addEventListener("DOMContentLoaded", scheduleScan, { once: true });
     } else {
-      throttleScan();
+      scheduleScan();
     }
-    window.setInterval(throttleScan, 1200);
+
+    window.setInterval(scheduleScan, 1200);
   });
 })();
