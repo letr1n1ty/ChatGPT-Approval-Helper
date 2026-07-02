@@ -23,7 +23,14 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
-      "js": ["content.js", "github-approval.js"],
+      "js": [
+        "shared/defaults.js",
+        "shared/storage.js",
+        "shared/dom.js",
+        "shared/clicker.js",
+        "content.js",
+        "github-approval.js"
+      ],
       "run_at": "document_idle"
     }
   ],
