@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -198,7 +198,8 @@
       border-bottom: 1px solid rgba(122, 162, 247, 0.10);
     }
 
-    .text-input {
+    .text-input,
+    .select-input {
       min-width: 0;
       height: 44px;
       border: 1px solid rgba(122, 162, 247, 0.18);
@@ -211,9 +212,15 @@
       transition: 160ms ease;
     }
 
+    .select-input {
+      width: 210px;
+      cursor: pointer;
+    }
+
     .text-input::placeholder { color: rgba(169, 177, 214, 0.54); }
 
-    .text-input:focus {
+    .text-input:focus,
+    .select-input:focus {
       border-color: rgba(122, 162, 247, 0.68);
       box-shadow: 0 0 0 4px rgba(122, 162, 247, 0.12);
     }
@@ -339,6 +346,7 @@
       h1 { font-size: 28px; }
       .input-row { grid-template-columns: 1fr; }
       .btn { width: 100%; }
+      .select-input { width: 100%; }
       .footer-card { align-items: stretch; flex-direction: column; }
       .footer-note { text-align: left; }
     }
@@ -349,18 +357,35 @@
     <header class="hero">
       <img src="icons/icon-128.png" class="app-icon" alt="ChatGPT Approval Helper">
       <div>
-        <h1>ChatGPT Approval Helper</h1>
-        <div class="subtitle">用 allowlist 控制 MCP tools、MCP servers 與 connectors 的自動授權。</div>
+        <h1 data-i18n="appTitle">ChatGPT Approval Helper</h1>
+        <div class="subtitle" data-i18n="subtitle">Control auto-approval for MCP tools, MCP servers, and connectors with allowlists.</div>
       </div>
     </header>
 
     <section class="ios-group">
-      <div class="group-title">Automation</div>
+      <div class="group-title" data-i18n="groupLanguage">Language</div>
       <div class="ios-card">
         <div class="ios-row">
           <div class="row-main">
-            <div class="row-title">自動核准信任項目</div>
-            <div class="row-desc">只會自動允許已列入下方清單的工具、伺服器或 Connector。</div>
+            <div class="row-title" data-i18n="languageTitle">Interface Language</div>
+            <div class="row-desc" data-i18n="languageDesc">The first launch follows your browser language. Unsupported languages fall back to English.</div>
+          </div>
+          <select id="language-select" class="select-input" aria-label="Interface Language">
+            <option value="zh-Hant" data-i18n="languageZhHant">繁體中文</option>
+            <option value="zh-Hans" data-i18n="languageZhHans">简体中文</option>
+            <option value="en" data-i18n="languageEn">English</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="ios-group">
+      <div class="group-title" data-i18n="groupAutomation">Automation</div>
+      <div class="ios-card">
+        <div class="ios-row">
+          <div class="row-main">
+            <div class="row-title" data-i18n="autoApproveTitle">Auto-approve trusted items</div>
+            <div class="row-desc" data-i18n="autoApproveDesc">Only tools, servers, or connectors in the allowlists below can be approved automatically.</div>
           </div>
           <label class="switch" aria-label="Auto Approve">
             <input type="checkbox" id="auto-approve-toggle">
@@ -371,63 +396,63 @@
     </section>
 
     <section class="ios-group">
-      <div class="group-title">API Tools</div>
+      <div class="group-title" data-i18n="groupTools">API Tools</div>
       <div class="ios-card">
         <div class="ios-row">
           <div class="row-main">
-            <div class="row-title">信任的 API 工具</div>
-            <div class="row-desc">例如 apply_patch、exec_command、git_status。</div>
+            <div class="row-title" data-i18n="toolsTitle">Trusted API Tools</div>
+            <div class="row-desc" data-i18n="toolsDesc">Examples: apply_patch, exec_command, git_status.</div>
           </div>
         </div>
         <div class="input-row">
-          <input type="text" id="tool-input" class="text-input" placeholder="輸入工具名稱，例如：git_status" autocomplete="off">
-          <button id="add-tool-btn" class="btn" type="button">新增</button>
+          <input type="text" id="tool-input" class="text-input" data-i18n-placeholder="toolPlaceholder" placeholder="Enter a tool name, for example: git_status" autocomplete="off">
+          <button id="add-tool-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-tools" class="chips-container"></div>
       </div>
     </section>
 
     <section class="ios-group">
-      <div class="group-title">MCP Servers</div>
+      <div class="group-title" data-i18n="groupServers">MCP Servers</div>
       <div class="ios-card">
         <div class="ios-row">
           <div class="row-main">
-            <div class="row-title">信任的 MCP 伺服器</div>
-            <div class="row-desc">針對整個 MCP server 名稱做 allowlist。</div>
+            <div class="row-title" data-i18n="serversTitle">Trusted MCP Servers</div>
+            <div class="row-desc" data-i18n="serversDesc">Allowlist complete MCP server names.</div>
           </div>
         </div>
         <div class="input-row">
-          <input type="text" id="server-input" class="text-input" placeholder="輸入伺服器名稱，例如：MCP Neverending Coding" autocomplete="off">
-          <button id="add-server-btn" class="btn" type="button">新增</button>
+          <input type="text" id="server-input" class="text-input" data-i18n-placeholder="serverPlaceholder" placeholder="Enter a server name, for example: MCP Neverending Coding" autocomplete="off">
+          <button id="add-server-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-servers" class="chips-container"></div>
       </div>
     </section>
 
     <section class="ios-group">
-      <div class="group-title">Connectors</div>
+      <div class="group-title" data-i18n="groupConnectors">Connectors</div>
       <div class="ios-card">
         <div class="ios-row">
           <div class="row-main">
-            <div class="row-title">信任的 ChatGPT Connector</div>
-            <div class="row-desc">GitHub 授權彈窗會受這裡控制，未來也能放 Google Drive、Notion 等項目。</div>
+            <div class="row-title" data-i18n="connectorsTitle">Trusted ChatGPT Connectors</div>
+            <div class="row-desc" data-i18n="connectorsDesc">GitHub approval prompts are controlled here. Future connectors such as Google Drive and Notion can be added here too.</div>
           </div>
         </div>
         <div class="input-row">
-          <input type="text" id="connector-input" class="text-input" placeholder="輸入 Connector 名稱，例如：GitHub" autocomplete="off">
-          <button id="add-connector-btn" class="btn" type="button">新增</button>
+          <input type="text" id="connector-input" class="text-input" data-i18n-placeholder="connectorPlaceholder" placeholder="Enter a connector name, for example: GitHub" autocomplete="off">
+          <button id="add-connector-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-connectors" class="chips-container"></div>
       </div>
     </section>
 
     <div class="footer-card">
-      <button id="reset-btn" class="btn btn-secondary" type="button">重設預設清單</button>
-      <div class="footer-note">變更會即時儲存到 chrome.storage.local</div>
+      <button id="reset-btn" class="btn btn-secondary" type="button" data-i18n="resetDefaults">Reset Defaults</button>
+      <div class="footer-note" data-i18n="saveNote">Changes are saved immediately to chrome.storage.local</div>
     </div>
   </main>
 
-  <div id="save-toast" class="toast">設定已儲存</div>
+  <div id="save-toast" class="toast" data-i18n="toastSaved">Settings saved</div>
   <script src="options.js"></script>
 </body>
 </html>
