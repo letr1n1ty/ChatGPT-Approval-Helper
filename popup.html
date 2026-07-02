@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -54,9 +54,7 @@
         linear-gradient(180deg, var(--tn-bg-deep), var(--tn-bg));
     }
 
-    .app-shell {
-      padding: 16px 14px 14px;
-    }
+    .app-shell { padding: 16px 14px 14px; }
 
     .hero {
       display: flex;
@@ -189,7 +187,8 @@
       border-bottom: 1px solid rgba(122, 162, 247, 0.10);
     }
 
-    .text-input {
+    .text-input,
+    .select-input {
       min-width: 0;
       height: 38px;
       border: 1px solid rgba(122, 162, 247, 0.18);
@@ -202,8 +201,14 @@
       transition: 160ms ease;
     }
 
+    .select-input {
+      width: 142px;
+      cursor: pointer;
+    }
+
     .text-input::placeholder { color: rgba(169, 177, 214, 0.54); }
-    .text-input:focus { border-color: rgba(122, 162, 247, 0.68); box-shadow: 0 0 0 4px rgba(122, 162, 247, 0.12); }
+    .text-input:focus,
+    .select-input:focus { border-color: rgba(122, 162, 247, 0.68); box-shadow: 0 0 0 4px rgba(122, 162, 247, 0.12); }
 
     .btn {
       height: 38px;
@@ -297,18 +302,34 @@
     <header class="hero">
       <img src="icons/icon-128.png" class="app-icon" alt="ChatGPT Approval Helper">
       <div>
-        <h1>Approval Helper</h1>
-        <div class="subtitle">控制 tools、servers 與 connectors 的自動授權。</div>
+        <h1 data-i18n="popupTitle">Approval Helper</h1>
+        <div class="subtitle" data-i18n="popupSubtitle">Control auto-approval for tools, servers, and connectors.</div>
       </div>
     </header>
 
     <section class="ios-group">
-      <div class="group-title">Automation</div>
+      <div class="group-title" data-i18n="groupLanguage">Language</div>
       <div class="ios-card">
         <div class="ios-row">
           <div class="row-main">
-            <div class="row-title">自動核准信任項目</div>
-            <div class="row-desc">僅允許 allowlist 中的項目。</div>
+            <div class="row-title" data-i18n="languageTitle">Interface Language</div>
+          </div>
+          <select id="language-select" class="select-input" aria-label="Interface Language">
+            <option value="zh-Hant" data-i18n="languageZhHant">繁體中文</option>
+            <option value="zh-Hans" data-i18n="languageZhHans">简体中文</option>
+            <option value="en" data-i18n="languageEn">English</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="ios-group">
+      <div class="group-title" data-i18n="groupAutomation">Automation</div>
+      <div class="ios-card">
+        <div class="ios-row">
+          <div class="row-main">
+            <div class="row-title" data-i18n="autoApproveTitle">Auto-approve trusted items</div>
+            <div class="row-desc" data-i18n="autoApproveDescShort">Only items in your allowlists can be approved.</div>
           </div>
           <label class="switch" aria-label="Auto Approve">
             <input type="checkbox" id="auto-approve-toggle">
@@ -319,50 +340,46 @@
     </section>
 
     <section class="ios-group">
-      <div class="group-title">API Tools</div>
+      <div class="group-title" data-i18n="groupTools">API Tools</div>
       <div class="ios-card">
         <div class="input-row">
-          <input type="text" id="tool-input" class="text-input" placeholder="git_status" autocomplete="off">
-          <button id="add-tool-btn" class="btn" type="button">新增</button>
+          <input type="text" id="tool-input" class="text-input" data-i18n-placeholder="toolPlaceholder" placeholder="git_status" autocomplete="off">
+          <button id="add-tool-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-tools" class="chips-container"></div>
       </div>
     </section>
 
     <section class="ios-group">
-      <div class="group-title">MCP Servers</div>
+      <div class="group-title" data-i18n="groupServers">MCP Servers</div>
       <div class="ios-card">
         <div class="input-row">
-          <input type="text" id="server-input" class="text-input" placeholder="MCP Server Name" autocomplete="off">
-          <button id="add-server-btn" class="btn" type="button">新增</button>
+          <input type="text" id="server-input" class="text-input" data-i18n-placeholder="serverPlaceholder" placeholder="MCP Server Name" autocomplete="off">
+          <button id="add-server-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-servers" class="chips-container"></div>
       </div>
     </section>
 
     <section class="ios-group">
-      <div class="group-title">Connectors</div>
+      <div class="group-title" data-i18n="groupConnectors">Connectors</div>
       <div class="ios-card">
         <div class="input-row">
-          <input type="text" id="connector-input" class="text-input" placeholder="GitHub" autocomplete="off">
-          <button id="add-connector-btn" class="btn" type="button">新增</button>
+          <input type="text" id="connector-input" class="text-input" data-i18n-placeholder="connectorPlaceholder" placeholder="GitHub" autocomplete="off">
+          <button id="add-connector-btn" class="btn" type="button" data-i18n="add">Add</button>
         </div>
         <div id="chips-list-connectors" class="chips-container"></div>
       </div>
     </section>
 
     <div class="footer-grid">
-      <button id="reset-btn" class="btn btn-secondary" type="button">重設</button>
-      <button class="btn" type="button" id="open-options-btn">完整設定</button>
+      <button id="reset-btn" class="btn btn-secondary" type="button" data-i18n="reset">Reset</button>
+      <button class="btn" type="button" id="open-options-btn" data-i18n="openFullSettings">Full Settings</button>
     </div>
   </main>
 
-  <div id="save-toast" class="toast">設定已儲存</div>
+  <div id="save-toast" class="toast" data-i18n="toastSaved">Settings saved</div>
   <script src="options.js"></script>
-  <script>
-    document.getElementById("open-options-btn").addEventListener("click", () => {
-      chrome.runtime.openOptionsPage();
-    });
-  </script>
+  <script src="popup.js"></script>
 </body>
 </html>
