@@ -4,11 +4,11 @@
 
 ChatGPT Approval Helper is a Manifest V3 browser extension that assists with approval dialogs inside the ChatGPT web app. It detects supported permission prompts, highlights trusted requests, and can automatically approve requests that match user-managed allowlists.
 
-The extension currently supports three approval categories:
+The extension supports three approval categories:
 
 - API tools, such as `apply_patch`, `exec_command`, and `git_status`
 - MCP servers, such as `MCP Neverending Coding`
-- ChatGPT connectors, currently including GitHub connector approval prompts
+- ChatGPT connectors, such as `GitHub`
 
 The project is intentionally small and client-side. It does not require a build step, a backend service, or external runtime dependencies.
 
@@ -17,23 +17,23 @@ The project is intentionally small and client-side. It does not require a build 
 ```text
 .
 ├── manifest.json          # Chrome extension manifest, Manifest V3
-├── content.js             # MCP and API tool approval detection and handling
-├── github-approval.js     # GitHub connector approval detection and handling
+├── content.js             # Single approval scanner, router, detectors, badge, and approval handling
 ├── options.html           # Full settings page
 ├── options.js             # Shared settings logic for options and popup UI
 ├── popup.html             # Extension popup quick settings UI
+├── shared/                # Shared defaults, storage, DOM, and click retry helpers
 ├── icons/                 # Extension icons
 └── AGENTS.md              # Maintenance instructions for coding agents
 ```
 
 ## Runtime Model
 
-The extension injects content scripts into ChatGPT pages:
+The extension injects one approval scanner into ChatGPT pages:
 
-- `content.js` scans the DOM for MCP and API tool approval dialogs.
-- `github-approval.js` scans the DOM for GitHub connector authorization dialogs.
-- Both scripts read policy from `chrome.storage.local`.
-- Approval is only automatic when `autoApprove` is enabled and the detected target is present in the corresponding allowlist.
+- `content.js` owns DOM scanning, approval classification, badge rendering, keyboard approval, and auto-approval retry handling.
+- Approval prompts are routed by detector priority: connector first, then MCP server, then API tool, then unknown review-only prompts.
+- Shared helpers under `shared/` provide defaults, settings storage, DOM traversal, robust clicking, and retry behavior.
+- Approval is only automatic when `autoApprove` is enabled and the detected target is present in the matching allowlist.
 
 The relevant storage keys are:
 
@@ -64,11 +64,24 @@ ChatGPT UI markup can change. DOM detection should therefore use resilient signa
 - visible dialog text
 - accessible labels
 - button text
-- `role="dialog"`
-- `aria-modal="true"`
+- semantic dialog, modal, popover, and Radix dialog hints
 - conservative parent traversal from visible approval buttons
+- open shadow-root traversal when available
 
 Avoid selectors that depend on unstable generated class names.
+
+### Approval Routing
+
+Approval classification must remain centralized in `content.js`.
+
+Detector priority matters:
+
+1. Connector approvals, such as GitHub authorization prompts
+2. MCP server approvals
+3. API tool approvals
+4. Unknown prompts, which may be highlighted but must not be auto-approved
+
+Do not reintroduce separate content-script scanners for individual connector types unless there is a hard technical constraint. Separate scanners can race against each other and misclassify the same approval dialog.
 
 ### Auto-Approval Rules
 
@@ -80,6 +93,12 @@ Automatic approval must remain policy-gated:
 - Global auto-approval must require `autoApprove === true`.
 
 Do not introduce unconditional auto-click behavior.
+
+### Background Tab Behavior
+
+The scanner should not rely exclusively on `requestAnimationFrame`, because hidden documents may delay foreground rendering callbacks. Use foreground-friendly scheduling for visible tabs and a hidden-document fallback such as `queueMicrotask` or `setTimeout`.
+
+Background tab auto-approval is best-effort. Content scripts can operate on page DOM, but browser throttling, tab discard, and ChatGPT rendering behavior can still delay approval until the tab becomes active again.
 
 ### UI Guidelines
 
@@ -122,8 +141,10 @@ Recommended checks:
 - Auto-approve disabled: no prompt should be automatically approved.
 - Auto-approve enabled, item absent from allowlist: prompt should not be automatically approved.
 - Auto-approve enabled, item present in allowlist: prompt should be approved.
+- GitHub connector approval should be classified as a Connector, not as an MCP server or API tool.
 - Removing `GitHub` from `trustedConnectors` should prevent GitHub connector auto-approval.
 - Popup and options page should reflect the same stored settings.
+- Hidden/background tabs should schedule scans without relying only on `requestAnimationFrame`.
 
 ## Release Notes
 
