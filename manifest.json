@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT MCP Approval Helper",
-  "version": "0.1.1",
-  "description": "Highlight trusted MCP approval dialogs and auto-approve or provide a manual confirmation hotkey.",
+  "name": "ChatGPT Approval Helper",
+  "version": "0.2.0",
+  "description": "Highlight trusted ChatGPT approval dialogs and auto-approve MCP tools, MCP servers, and connectors based on your allowlists.",
   "permissions": ["storage"],
   "icons": {
     "16": "icons/icon-16.png",
@@ -10,6 +10,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
