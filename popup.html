@@ -1,142 +1,368 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Approval Helper</title>
-<style>
-  :root {
-    --bg: #1a1b26;
-    --card: rgba(31, 35, 53, 0.85);
-    --text: #c0caf5;
-    --muted: #a9b1d6;
-    --accent: #7aa2f7;
-    --green: #9ece6a;
-    --red: #f7768e;
-  }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approval Helper</title>
+  <style>
+    :root {
+      --tn-bg: #1a1b26;
+      --tn-bg-deep: #16161e;
+      --tn-surface: rgba(31, 35, 53, 0.82);
+      --tn-separator: rgba(122, 162, 247, 0.16);
+      --tn-text: #c0caf5;
+      --tn-text-strong: #d5dcff;
+      --tn-muted: #a9b1d6;
+      --tn-muted-2: #565f89;
+      --tn-blue: #7aa2f7;
+      --tn-cyan: #7dcfff;
+      --tn-green: #9ece6a;
+      --tn-red: #f7768e;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    }
 
-  body {
-    margin: 0;
-    width: 380px;
-    background: radial-gradient(circle at top, #16161e, #1a1b26);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui;
-  }
+    * { box-sizing: border-box; }
 
-  .wrap {
-    padding: 14px;
-  }
+    html {
+      background: var(--tn-bg-deep);
+      overscroll-behavior: none;
+    }
 
-  .header {
-    font-size: 16px;
-    font-weight: 800;
-    margin-bottom: 10px;
-  }
+    body {
+      position: relative;
+      isolation: isolate;
+      margin: 0;
+      width: 410px;
+      max-height: 600px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: var(--tn-text);
+      font-family: var(--font);
+      background: var(--tn-bg-deep);
+      overscroll-behavior: none;
+    }
 
-  .card {
-    background: var(--card);
-    border: 1px solid rgba(122,162,247,0.2);
-    border-radius: 14px;
-    padding: 12px;
-    margin-bottom: 10px;
-    backdrop-filter: blur(16px);
-  }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -4px;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(122, 162, 247, 0.18), transparent 36%),
+        radial-gradient(circle at 95% 10%, rgba(187, 154, 247, 0.12), transparent 32%),
+        linear-gradient(180deg, var(--tn-bg-deep), var(--tn-bg));
+    }
 
-  .row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+    .app-shell {
+      padding: 16px 14px 14px;
+    }
 
-  .title {
-    font-size: 13px;
-    font-weight: 700;
-  }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 4px 14px;
+    }
 
-  .desc {
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 4px;
-  }
+    .app-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      border: 1px solid rgba(122, 162, 247, 0.24);
+      box-shadow: 0 14px 30px rgba(122, 162, 247, 0.18), inset 0 1px rgba(255, 255, 255, 0.08);
+      background: linear-gradient(145deg, rgba(122, 162, 247, 0.20), rgba(187, 154, 247, 0.10));
+    }
 
-  .switch {
-    transform: scale(1.1);
-  }
+    h1 {
+      margin: 0;
+      color: var(--tn-text-strong);
+      font-size: 20px;
+      letter-spacing: -0.035em;
+      line-height: 1.05;
+    }
 
-  .btn {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--accent), #7dcfff);
-    color: #0f0f14;
-    font-weight: 800;
-    cursor: pointer;
-  }
+    .subtitle {
+      margin-top: 3px;
+      color: var(--tn-muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
 
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-  }
+    .ios-group { margin-bottom: 13px; }
 
-  .chip {
-    background: rgba(122,162,247,0.15);
-    border: 1px solid rgba(122,162,247,0.25);
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 11px;
-  }
+    .group-title {
+      margin: 0 0 7px 13px;
+      color: var(--tn-muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
 
-  .footer {
-    margin-top: 10px;
-    text-align: center;
-    font-size: 11px;
-    color: var(--muted);
-  }
-</style>
+    .ios-card {
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid var(--tn-separator);
+      background: var(--tn-surface);
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.30);
+      backdrop-filter: blur(18px) saturate(1.2);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    }
+
+    .ios-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      min-height: 56px;
+      border-bottom: 1px solid rgba(122, 162, 247, 0.10);
+    }
+
+    .ios-row:last-child { border-bottom: 0; }
+    .row-main { flex: 1; min-width: 0; }
+
+    .row-title {
+      color: var(--tn-text-strong);
+      font-size: 14px;
+      font-weight: 720;
+      letter-spacing: -0.01em;
+    }
+
+    .row-desc {
+      margin-top: 3px;
+      color: var(--tn-muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-flex;
+      width: 46px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+      border-radius: 999px;
+      background: rgba(86, 95, 137, 0.55);
+      border: 1px solid rgba(169, 177, 214, 0.16);
+      transition: 180ms ease;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 2px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.34);
+      transition: 180ms ease;
+    }
+
+    input:checked + .slider {
+      background: linear-gradient(135deg, var(--tn-green), var(--tn-cyan));
+      box-shadow: 0 0 0 4px rgba(158, 206, 106, 0.12);
+    }
+
+    input:checked + .slider::before { transform: translateX(18px); }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 11px 14px;
+      border-bottom: 1px solid rgba(122, 162, 247, 0.10);
+    }
+
+    .text-input {
+      min-width: 0;
+      height: 38px;
+      border: 1px solid rgba(122, 162, 247, 0.18);
+      border-radius: 12px;
+      padding: 0 11px;
+      color: var(--tn-text-strong);
+      background: rgba(22, 22, 30, 0.74);
+      outline: none;
+      font: 550 12px var(--font);
+      transition: 160ms ease;
+    }
+
+    .text-input::placeholder { color: rgba(169, 177, 214, 0.54); }
+    .text-input:focus { border-color: rgba(122, 162, 247, 0.68); box-shadow: 0 0 0 4px rgba(122, 162, 247, 0.12); }
+
+    .btn {
+      height: 38px;
+      border: 0;
+      border-radius: 12px;
+      padding: 0 13px;
+      color: #101014;
+      background: linear-gradient(135deg, var(--tn-blue), var(--tn-cyan));
+      font: 800 12px var(--font);
+      cursor: pointer;
+      transition: 160ms ease;
+      box-shadow: 0 10px 22px rgba(122, 162, 247, 0.16);
+      white-space: nowrap;
+    }
+
+    .btn:hover { filter: brightness(1.05); }
+    .btn-secondary {
+      width: 100%;
+      color: var(--tn-text);
+      background: rgba(86, 95, 137, 0.28);
+      border: 1px solid rgba(169, 177, 214, 0.14);
+      box-shadow: none;
+    }
+
+    .chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      max-height: 86px;
+      overflow: auto;
+      padding: 12px 14px;
+      background: rgba(22, 22, 30, 0.34);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      max-width: 100%;
+      padding: 6px 8px 6px 10px;
+      color: var(--tn-cyan);
+      background: rgba(122, 162, 247, 0.13);
+      border: 1px solid rgba(122, 162, 247, 0.22);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .chip span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chip-delete {
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border: 0;
+      padding: 0;
+      border-radius: 999px;
+      color: var(--tn-red);
+      background: rgba(247, 118, 142, 0.12);
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .empty-state {
+      width: 100%;
+      padding: 6px 0;
+      color: var(--tn-muted-2);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .toast { display: none; }
+  </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">ChatGPT Approval</div>
-
-    <div class="card">
-      <div class="row">
-        <div>
-          <div class="title">Auto Approve</div>
-          <div class="desc">Trust allowlist auto click</div>
-        </div>
-        <input type="checkbox" id="auto-approve-toggle" />
+  <main class="app-shell">
+    <header class="hero">
+      <img src="icons/icon-128.png" class="app-icon" alt="ChatGPT Approval Helper">
+      <div>
+        <h1>Approval Helper</h1>
+        <div class="subtitle">控制 tools、servers 與 connectors 的自動授權。</div>
       </div>
+    </header>
+
+    <section class="ios-group">
+      <div class="group-title">Automation</div>
+      <div class="ios-card">
+        <div class="ios-row">
+          <div class="row-main">
+            <div class="row-title">自動核准信任項目</div>
+            <div class="row-desc">僅允許 allowlist 中的項目。</div>
+          </div>
+          <label class="switch" aria-label="Auto Approve">
+            <input type="checkbox" id="auto-approve-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="ios-group">
+      <div class="group-title">API Tools</div>
+      <div class="ios-card">
+        <div class="input-row">
+          <input type="text" id="tool-input" class="text-input" placeholder="git_status" autocomplete="off">
+          <button id="add-tool-btn" class="btn" type="button">新增</button>
+        </div>
+        <div id="chips-list-tools" class="chips-container"></div>
+      </div>
+    </section>
+
+    <section class="ios-group">
+      <div class="group-title">MCP Servers</div>
+      <div class="ios-card">
+        <div class="input-row">
+          <input type="text" id="server-input" class="text-input" placeholder="MCP Server Name" autocomplete="off">
+          <button id="add-server-btn" class="btn" type="button">新增</button>
+        </div>
+        <div id="chips-list-servers" class="chips-container"></div>
+      </div>
+    </section>
+
+    <section class="ios-group">
+      <div class="group-title">Connectors</div>
+      <div class="ios-card">
+        <div class="input-row">
+          <input type="text" id="connector-input" class="text-input" placeholder="GitHub" autocomplete="off">
+          <button id="add-connector-btn" class="btn" type="button">新增</button>
+        </div>
+        <div id="chips-list-connectors" class="chips-container"></div>
+      </div>
+    </section>
+
+    <div class="footer-grid">
+      <button id="reset-btn" class="btn btn-secondary" type="button">重設</button>
+      <button class="btn" type="button" id="open-options-btn">完整設定</button>
     </div>
+  </main>
 
-    <div class="card">
-      <div class="title">Tools</div>
-      <input id="tool-input" placeholder="git_status" />
-      <button class="btn" id="add-tool-btn">Add Tool</button>
-      <div id="chips-list-tools" class="chips"></div>
-    </div>
-
-    <div class="card">
-      <div class="title">Servers</div>
-      <input id="server-input" placeholder="MCP Server" />
-      <button class="btn" id="add-server-btn">Add Server</button>
-      <div id="chips-list-servers" class="chips"></div>
-    </div>
-
-    <div class="card">
-      <div class="title">Connectors</div>
-      <input id="connector-input" placeholder="GitHub" />
-      <button class="btn" id="add-connector-btn">Add Connector</button>
-      <div id="chips-list-connectors" class="chips"></div>
-    </div>
-
-    <button class="btn" id="reset-btn">Reset All</button>
-
-    <div class="footer">Tokyo Night iOS Style UI</div>
-  </div>
-
+  <div id="save-toast" class="toast">設定已儲存</div>
   <script src="options.js"></script>
+  <script>
+    document.getElementById("open-options-btn").addEventListener("click", () => {
+      chrome.runtime.openOptionsPage();
+    });
+  </script>
 </body>
 </html>
