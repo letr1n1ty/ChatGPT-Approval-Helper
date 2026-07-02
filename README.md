@@ -29,6 +29,8 @@ Auto-approval only happens when:
 2. The detected approval target matches the relevant allowlist.
 3. The approve button is visible and enabled.
 
+When `autoApprove` is disabled, the extension clears its badge and does not run the normal approval scan loop.
+
 ## Security Model
 
 The extension is allowlist-based. It should not approve unknown tools, unknown MCP servers, or unknown connectors.
@@ -107,7 +109,9 @@ Recommended manual test cases:
 - Add and remove MCP servers from the popup and options page.
 - Add and remove connectors from the popup and options page.
 - Confirm that settings persist after reopening the popup.
+- Confirm that no badge or outline is shown when `autoApprove` is disabled.
 - Confirm that GitHub connector approval is classified as a Connector, not as an MCP server or API tool.
+- Confirm that sidebar conversation titles containing words such as `GitHub`, `authorize`, or `allow` are ignored.
 - Confirm that GitHub connector auto-approval stops when `GitHub` is removed from `trustedConnectors`.
 - Confirm that no prompt is automatically approved when `autoApprove` is disabled.
 - Confirm that background tabs still scan without depending only on `requestAnimationFrame`.
@@ -120,13 +124,16 @@ The extension targets Chromium-based browsers that support Manifest V3, includin
 
 ChatGPT UI changes can affect dialog detection. The extension therefore avoids generated CSS class selectors where possible and relies on visible text, accessible labels, semantic dialog hints, conservative DOM traversal, and approval-button proximity.
 
-Version `0.3.0` consolidates approval handling into one scanner:
+Version `0.3.1` tightens scan ownership and scope:
 
-- Uses a single `content.js` scanner instead of separate MCP/API and GitHub connector scanners.
+- Keeps the single `content.js` scanner introduced in `0.3.0`.
 - Routes approval prompts by detector priority: Connector first, then MCP server, then API tool, then unknown review-only prompts.
 - Prevents `GitHub` from being misclassified as a generic `git` tool signal.
+- Skips normal detection entirely when `autoApprove` is disabled.
+- Restricts scan candidates to conversation surfaces, semantic dialogs, modals, popovers, and Radix dialog surfaces.
+- Excludes app chrome such as the sidebar, navigation, history, and conversation-list areas.
 - Keeps all approval types on the same retry and audit-log path.
-- Uses `MutationObserver` plus interval safety scans.
+- Uses `MutationObserver` plus interval safety scans only while auto-approval is active.
 - Uses `queueMicrotask` for hidden documents and `requestAnimationFrame` only for visible foreground scans, so background tabs do not depend exclusively on foreground rendering callbacks.
 
 New approval surfaces should be added as explicit detector branches with a matching allowlist policy.
