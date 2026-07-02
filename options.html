@@ -29,16 +29,36 @@
 
     * { box-sizing: border-box; }
 
+    html {
+      min-height: 100%;
+      background: var(--tn-bg-deep);
+      overscroll-behavior: none;
+    }
+
     body {
+      position: relative;
+      isolation: isolate;
       margin: 0;
       min-height: 100vh;
+      min-height: 100dvh;
       color: var(--tn-text);
       font-family: var(--font);
+      background: var(--tn-bg-deep);
+      padding: 40px 20px 48px;
+      overflow-x: hidden;
+      overscroll-behavior: none;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -4px;
+      z-index: -1;
+      pointer-events: none;
       background:
         radial-gradient(circle at 18% 0%, rgba(122, 162, 247, 0.18), transparent 34%),
         radial-gradient(circle at 92% 12%, rgba(187, 154, 247, 0.14), transparent 30%),
         linear-gradient(180deg, var(--tn-bg-deep), var(--tn-bg));
-      padding: 40px 20px 48px;
     }
 
     .app-shell {
@@ -78,9 +98,7 @@
       line-height: 1.5;
     }
 
-    .ios-group {
-      margin-bottom: 26px;
-    }
+    .ios-group { margin-bottom: 26px; }
 
     .group-title {
       margin: 0 0 9px 16px;
@@ -112,7 +130,6 @@
     }
 
     .ios-row:last-child { border-bottom: 0; }
-
     .row-main { flex: 1; min-width: 0; }
 
     .row-title {
@@ -333,7 +350,7 @@
       <img src="icons/icon-128.png" class="app-icon" alt="ChatGPT Approval Helper">
       <div>
         <h1>ChatGPT Approval Helper</h1>
-        <div class="subtitle">Tokyo Night 風格的 iOS Settings 介面。用 allowlist 控制 MCP tools、MCP servers 與 connectors 的自動授權。</div>
+        <div class="subtitle">用 allowlist 控制 MCP tools、MCP servers 與 connectors 的自動授權。</div>
       </div>
     </header>
 
