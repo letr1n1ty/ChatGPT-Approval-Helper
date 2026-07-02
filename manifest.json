@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Approval Helper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Highlight trusted ChatGPT approval dialogs and auto-approve MCP tools, MCP servers, and connectors based on your allowlists.",
   "permissions": ["storage"],
   "icons": {
