@@ -27,6 +27,29 @@
     { name: "Microsoft OneDrive", aliases: ["microsoft onedrive", "onedrive", "one drive"] }
   ]);
 
+  const DISALLOWED_APP_CHROME_SELECTORS = [
+    "nav",
+    "aside",
+    "[data-testid*='sidebar' i]",
+    "[data-testid*='history' i]",
+    "[data-testid*='conversation-list' i]",
+    "[data-testid*='nav' i]",
+    "[aria-label*='sidebar' i]",
+    "[aria-label*='history' i]",
+    "[aria-label*='chat history' i]",
+    "[aria-label*='conversation history' i]"
+  ].join(", ");
+
+  const SEMANTIC_APPROVAL_SURFACE_SELECTORS = [
+    '[role="dialog"]',
+    '[aria-modal="true"]',
+    '[data-testid*="modal" i]',
+    '[data-testid*="dialog" i]',
+    '[data-radix-dialog-content]',
+    '[data-radix-portal]',
+    '[popover]'
+  ].join(", ");
+
   const handledApprovals = new WeakSet();
   const pendingApprovals = new WeakSet();
 
@@ -74,7 +97,43 @@
 
     settings = await Storage.saveSettings(nextSettings);
     refreshDerivedSettings();
-    scan();
+    scheduleScan();
+  }
+
+  function safeMatches(el, selector) {
+    try {
+      return Boolean(el?.matches?.(selector));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function safeClosest(el, selector) {
+    try {
+      return el?.closest?.(selector) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function isInsideAppChrome(el) {
+    return Boolean(safeClosest(el, DISALLOWED_APP_CHROME_SELECTORS));
+  }
+
+  function isSemanticApprovalSurface(el) {
+    return safeMatches(el, SEMANTIC_APPROVAL_SURFACE_SELECTORS) || Boolean(safeClosest(el, SEMANTIC_APPROVAL_SURFACE_SELECTORS));
+  }
+
+  function isInsideConversationSurface(el) {
+    const main = safeClosest(el, "main, [role='main']");
+    if (!main) return false;
+    if (isInsideAppChrome(el)) return false;
+    return true;
+  }
+
+  function isAllowedScanRegion(el) {
+    if (!el || isInsideAppChrome(el)) return false;
+    return isSemanticApprovalSurface(el) || isInsideConversationSurface(el);
   }
 
   function textContainsName(text, name) {
@@ -120,6 +179,8 @@
   }
 
   function scoreApprovalButton(button) {
+    if (!isAllowedScanRegion(button)) return 0;
+
     const text = Dom.getAccessibleText(button);
     if (!text || isRejectButtonText(text)) return 0;
 
@@ -146,7 +207,7 @@
 
   function findApprovalButton(root) {
     const buttons = Dom.queryAllDeep("button, [role='button']", root)
-      .filter(Dom.isElementVisible)
+      .filter(button => Dom.isElementVisible(button) && isAllowedScanRegion(button))
       .map(button => ({ button, score: scoreApprovalButton(button) }))
       .filter(entry => entry.score > 0)
       .sort((a, b) => b.score - a.score);
@@ -266,7 +327,7 @@
   }
 
   function isApprovalCandidate(root) {
-    if (!root || !Dom.isElementVisible(root)) return false;
+    if (!root || !Dom.isElementVisible(root) || !isAllowedScanRegion(root)) return false;
 
     const text = Dom.getVisibleText(root);
     if (!text || text.length < 4) return false;
@@ -276,19 +337,13 @@
   }
 
   function getApprovalCandidates() {
-    const explicitCandidates = Dom.queryAllDeep([
-      '[role="dialog"]',
-      '[aria-modal="true"]',
-      '[data-testid*="modal" i]',
-      '[data-testid*="dialog" i]',
-      '[data-radix-dialog-content]',
-      '[data-radix-portal]',
-      '[popover]'
-    ].join(", "));
+    const explicitCandidates = Dom.queryAllDeep(SEMANTIC_APPROVAL_SURFACE_SELECTORS)
+      .filter(candidate => isAllowedScanRegion(candidate));
 
     const buttonParentCandidates = Dom.queryAllDeep("button, [role='button']")
-      .filter(button => scoreApprovalButton(button) > 0)
-      .flatMap(button => Dom.getComposedParents(button, 10));
+      .filter(button => Dom.isElementVisible(button) && scoreApprovalButton(button) > 0)
+      .flatMap(button => Dom.getComposedParents(button, 10))
+      .filter(parent => isAllowedScanRegion(parent));
 
     return Array.from(new Set([...explicitCandidates, ...buttonParentCandidates]))
       .filter(isApprovalCandidate)
@@ -314,7 +369,7 @@
       "[data-testid*='server' i]",
       "[data-testid*='command' i]"
     ].join(", "), root)
-      .filter(Dom.isElementVisible)
+      .filter(element => Dom.isElementVisible(element) && isAllowedScanRegion(element))
       .map(Dom.getVisibleText)
       .map(cleanCandidateName)
       .filter(Boolean);
@@ -713,6 +768,11 @@
   }
 
   function scan() {
+    if (settings.autoApprove !== true) {
+      removeBadgeAndOutline();
+      return;
+    }
+
     const target = getCurrentApproval();
 
     if (!target) {
@@ -723,7 +783,7 @@
     const trusted = isTrustedTarget(target);
     showBadge(target, trusted);
 
-    if (settings.autoApprove === true && trusted) {
+    if (trusted) {
       autoApproveWithRetry(target);
     }
   }
@@ -751,6 +811,11 @@
 
   let scanPending = false;
   function scheduleScan() {
+    if (settings.autoApprove !== true) {
+      removeBadgeAndOutline();
+      return;
+    }
+
     if (scanPending) return;
     scanPending = true;
 
@@ -784,7 +849,11 @@
 
   Storage.onSettingsChanged(async () => {
     await refreshSettings();
-    scheduleScan();
+    if (settings.autoApprove === true) {
+      scheduleScan();
+    } else {
+      removeBadgeAndOutline();
+    }
   });
 
   refreshSettings().then(() => {
@@ -794,6 +863,8 @@
       scheduleScan();
     }
 
-    window.setInterval(scheduleScan, 1200);
+    window.setInterval(() => {
+      if (settings.autoApprove === true) scheduleScan();
+    }, 1200);
   });
 })();
